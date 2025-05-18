@@ -1,0 +1,158 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GA1 - Chor Police</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: Arial, sans-serif;
+      background-color: #111;
+      color: #fff;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    canvas {
+      border: 2px solid #00ffff;
+      margin-top: 20px;
+    }
+    #scoreboard {
+      margin-top: 10px;
+      font-size: 18px;
+    }
+    #retryBtn {
+      margin-top: 15px;
+      display: none;
+      padding: 10px 20px;
+      font-size: 16px;
+      background-color: #00ffff;
+      color: #111;
+      border: none;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <h1>Chor Police</h1>
+  <p>Run and survive as long as you can!</p>
+  <canvas id="gameCanvas" width="800" height="600"></canvas>
+  <div id="scoreboard">Time Survived: <span id="time">0</span> seconds</div>
+  <button id="retryBtn" onclick="location.reload()">Retry</button>
+
+  <script>
+    const canvas = document.getElementById("gameCanvas");
+    const ctx = canvas.getContext("2d");
+    const timeDisplay = document.getElementById("time");
+    const retryBtn = document.getElementById("retryBtn");
+
+    let player = { x: 50, y: 50, size: 15, color: "#00ffff" };
+    let police = { x: 750, y: 550, size: 15, color: "#ff4444" };
+    let keys = {};
+    let startTime = Date.now();
+    let gameOver = false;
+    let obstacles = generateObstacles();
+    let obstacleRegeneration = [];
+
+    function generateObstacles() {
+      let obs = [];
+      for (let i = 0; i < 5; i++) {
+        obs.push({
+          x: Math.random() * 700 + 50,
+          y: Math.random() * 500 + 50,
+          w: 40,
+          h: 40,
+          destroyed: false
+        });
+      }
+      return obs;
+    }
+
+    function drawEntity(entity) {
+      ctx.fillStyle = entity.color;
+      ctx.fillRect(entity.x, entity.y, entity.size, entity.size);
+    }
+
+    function drawObstacles() {
+      ctx.fillStyle = "#555";
+      obstacles.forEach((o, i) => {
+        if (!o.destroyed) ctx.fillRect(o.x, o.y, o.w, o.h);
+      });
+    }
+
+    function movePlayer() {
+      if (keys["ArrowUp"] && player.y > 0) player.y -= 3;
+      if (keys["ArrowDown"] && player.y + player.size < canvas.height) player.y += 3;
+      if (keys["ArrowLeft"] && player.x > 0) player.x -= 3;
+      if (keys["ArrowRight"] && player.x + player.size < canvas.width) player.x += 3;
+    }
+
+    function movePolice() {
+      let moved = false;
+      if (police.x < player.x && police.x + police.size < canvas.width) { police.x += 2; moved = true; }
+      if (police.x > player.x && police.x > 0) { police.x -= 2; moved = true; }
+      if (police.y < player.y && police.y + police.size < canvas.height) { police.y += 2; moved = true; }
+      if (police.y > player.y && police.y > 0) { police.y -= 2; moved = true; }
+
+      obstacles.forEach((o, i) => {
+        if (!o.destroyed && isColliding(police, { x: o.x, y: o.y, size: o.w })) {
+          o.destroyed = true;
+          obstacleRegeneration.push({ index: i, time: Date.now() + 2000 });
+        }
+      });
+    }
+
+    function isColliding(a, b) {
+      return a.x < b.x + b.size &&
+             a.x + a.size > b.x &&
+             a.y < b.y + b.size &&
+             a.y + a.size > b.y;
+    }
+
+    function detectCollision() {
+      return (
+        player.x < police.x + police.size &&
+        player.x + player.size > police.x &&
+        player.y < police.y + police.size &&
+        player.y + player.size > police.y
+      );
+    }
+
+    function updateGame() {
+      if (gameOver) return;
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      movePlayer();
+      movePolice();
+
+      drawObstacles();
+      drawEntity(player);
+      drawEntity(police);
+
+      obstacleRegeneration.forEach((regen, idx) => {
+        if (Date.now() > regen.time) {
+          obstacles[regen.index].destroyed = false;
+          obstacleRegeneration.splice(idx, 1);
+        }
+      });
+
+      if (detectCollision()) {
+        gameOver = true;
+        retryBtn.style.display = "block";
+      }
+
+      let currentTime = ((Date.now() - startTime) / 1000).toFixed(1);
+      timeDisplay.textContent = currentTime;
+      requestAnimationFrame(updateGame);
+    }
+
+    document.addEventListener("keydown", e => keys[e.key] = true);
+    document.addEventListener("keyup", e => keys[e.key] = false);
+
+    updateGame();
+  </script>
+</body>
+</html>

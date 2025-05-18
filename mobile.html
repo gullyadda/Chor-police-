@@ -1,0 +1,241 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chor Police - Mobile</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: Arial, sans-serif;
+      background: #111;
+      color: white;
+      overflow: hidden;
+    }
+    #game-container {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+      background: #222;
+      border: 5px solid #fff;
+    }
+    .player, .police {
+      width: 30px;
+      height: 30px;
+      position: absolute;
+      border-radius: 50%;
+    }
+    .player { background: cyan; }
+    .police { background: red; }
+    .obstacle {
+      position: absolute;
+      width: 50px;
+      height: 50px;
+      background: gray;
+    }
+    .hidden { display: none; }
+    #controls {
+      position: absolute;
+      bottom: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 10px;
+    }
+    .btn {
+      width: 60px;
+      height: 60px;
+      background: white;
+      color: black;
+      font-size: 24px;
+      border-radius: 10px;
+      border: none;
+    }
+    #gameover {
+      position: absolute;
+      top: 40%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: #000;
+      padding: 20px;
+      border: 2px solid white;
+      text-align: center;
+      display: none;
+    }
+    #timer {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      font-size: 1.2em;
+    }
+  </style>
+</head>
+<body>
+  <div id="game-container">
+    <div id="player" class="player"></div>
+    <div id="police" class="police"></div>
+    <div id="gameover">
+      <h2>GAME OVER</h2>
+      <p>CHOR PAKDA GYA!</p>
+      <p id="bestScore"></p>
+      <button onclick="location.reload()">Replay</button>
+      <button onclick="location.href='game.html'">Home</button>
+    </div>
+    <div id="timer">Time: 0s</div>
+  </div>
+
+  <div id="controls">
+    <button class="btn" id="left">&#8592;</button>
+    <button class="btn" id="up">&#8593;</button>
+    <button class="btn" id="down">&#8595;</button>
+    <button class="btn" id="right">&#8594;</button>
+  </div>
+
+<script>
+  const player = document.getElementById('player');
+  const police = document.getElementById('police');
+  const gameover = document.getElementById('gameover');
+  const bestScore = document.getElementById('bestScore');
+  const timerDisplay = document.getElementById('timer');
+  const container = document.getElementById('game-container');
+
+  let px = 20, py = 20;
+  let ox = 300, oy = 500;
+  let gameRunning = true;
+  let startTime = Date.now();
+  let moveDir = "";
+  const playerSpeed = 5;
+  let policeSpeed = 2.8;
+  const obstacleCount = 4;
+  let obstacles = [];
+  let obstacleTimers = {};
+
+  function createObstacles() {
+    obstacles.forEach(obs => container.removeChild(obs));
+    obstacles = [];
+    for (let i = 0; i < obstacleCount; i++) {
+      const div = document.createElement('div');
+      div.className = 'obstacle';
+      const x = Math.random() * (window.innerWidth - 60);
+      const y = Math.random() * (window.innerHeight - 200) + 60;
+      div.style.left = `${x}px`;
+      div.style.top = `${y}px`;
+      div.dataset.index = i;
+      container.appendChild(div);
+      obstacles.push(div);
+    }
+  }
+
+  function move() {
+    if (!gameRunning || !moveDir) return;
+    let tempX = px, tempY = py;
+    if (moveDir === 'left') tempX -= playerSpeed;
+    if (moveDir === 'right') tempX += playerSpeed;
+    if (moveDir === 'up') tempY -= playerSpeed;
+    if (moveDir === 'down') tempY += playerSpeed;
+
+    if (!collidesWithObstacles(tempX, tempY)) {
+      px = Math.max(0, Math.min(tempX, window.innerWidth - 30));
+      py = Math.max(0, Math.min(tempY, window.innerHeight - 30));
+      updatePosition(player, px, py);
+    }
+  }
+
+  function collides(ax, ay, bx, by, bw = 30, bh = 30) {
+    return ax < bx + bw && ax + 30 > bx && ay < by + bh && ay + 30 > by;
+  }
+
+  function collidesWithObstacles(x, y) {
+    return obstacles.some(obs => {
+      if (obs.classList.contains('hidden')) return false;
+      const ox = parseInt(obs.style.left);
+      const oy = parseInt(obs.style.top);
+      return collides(x, y, ox, oy, 50, 50);
+    });
+  }
+
+  function updatePosition(el, x, y) {
+    el.style.left = x + 'px';
+    el.style.top = y + 'px';
+  }
+
+  function checkCollision() {
+    if (collides(px, py, ox, oy)) {
+      gameRunning = false;
+      const survivalTime = Math.floor((Date.now() - startTime) / 1000);
+      bestScore.textContent = `Your Best: ${survivalTime} seconds`;
+      gameover.style.display = 'block';
+    }
+  }
+
+  function updateTimer() {
+    const now = Date.now();
+    const sec = Math.floor((now - startTime) / 1000);
+    timerDisplay.textContent = `Time: ${sec}s`;
+    if (sec >= 120) policeSpeed = playerSpeed;
+  }
+
+  function updatePolice() {
+    if (!gameRunning) return;
+
+    const dx = px - ox;
+    const dy = py - oy;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    if (dist > 1) {
+      ox += (dx / dist) * policeSpeed;
+      oy += (dy / dist) * policeSpeed;
+      ox = Math.max(0, Math.min(ox, window.innerWidth - 30));
+      oy = Math.max(0, Math.min(oy, window.innerHeight - 30));
+    }
+
+    updatePosition(police, ox, oy);
+    obstacles.forEach(obs => {
+      const ix = parseInt(obs.style.left);
+      const iy = parseInt(obs.style.top);
+      const idx = obs.dataset.index;
+
+      if (!obs.classList.contains('hidden') && collides(ox, oy, ix, iy, 50, 50)) {
+        if (!obstacleTimers[idx]) {
+          obstacleTimers[idx] = Date.now();
+        } else {
+          if (Date.now() - obstacleTimers[idx] > 5000) {
+            obs.classList.add('hidden');
+            setTimeout(() => {
+              obs.classList.remove('hidden');
+            }, 5000);
+            delete obstacleTimers[idx];
+          }
+        }
+      } else {
+        delete obstacleTimers[idx];
+      }
+    });
+
+    checkCollision();
+  }
+
+  function gameLoop() {
+    if (!gameRunning) return;
+    updateTimer();
+    updatePolice();
+    move();
+    requestAnimationFrame(gameLoop);
+  }
+
+  document.getElementById('left').addEventListener('touchstart', () => moveDir = 'left');
+  document.getElementById('right').addEventListener('touchstart', () => moveDir = 'right');
+  document.getElementById('up').addEventListener('touchstart', () => moveDir = 'up');
+  document.getElementById('down').addEventListener('touchstart', () => moveDir = 'down');
+  document.getElementById('left').addEventListener('touchend', () => moveDir = '');
+  document.getElementById('right').addEventListener('touchend', () => moveDir = '');
+  document.getElementById('up').addEventListener('touchend', () => moveDir = '');
+  document.getElementById('down').addEventListener('touchend', () => moveDir = '');
+
+  updatePosition(player, px, py);
+  updatePosition(police, ox, oy);
+  createObstacles();
+  gameLoop();
+</script>
+</body>
+</html>
